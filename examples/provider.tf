@@ -1,7 +1,7 @@
 terraform {
   required_providers {
     cortex = {
-      source  = "registry.terraform.io/warlock/cortex"
+      source  = "registry.terraform.io/mdrobniu/cortex"
       version = "~> 0.1"
     }
   }

@@ -27,7 +27,7 @@ cd terraform-provider-cortex
 make install
 ```
 
-This builds the binary and copies it to `~/.terraform.d/plugins/registry.terraform.io/warlock/cortex/0.1.0/linux_amd64/`.
+This builds the binary and copies it to `~/.terraform.d/plugins/registry.terraform.io/mdrobniu/cortex/0.1.0/linux_amd64/`.
 
 ## Quick Start
 
@@ -37,7 +37,7 @@ This builds the binary and copies it to `~/.terraform.d/plugins/registry.terrafo
 terraform {
   required_providers {
     cortex = {
-      source  = "registry.terraform.io/warlock/cortex"
+      source  = "registry.terraform.io/mdrobniu/cortex"
       version = "~> 0.1"
     }
   }

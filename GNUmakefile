@@ -4,8 +4,8 @@ build:
 	go build -o terraform-provider-cortex
 
 install: build
-	mkdir -p ~/.terraform.d/plugins/registry.terraform.io/warlock/cortex/0.1.0/linux_amd64
-	cp terraform-provider-cortex ~/.terraform.d/plugins/registry.terraform.io/warlock/cortex/0.1.0/linux_amd64/
+	mkdir -p ~/.terraform.d/plugins/registry.terraform.io/mdrobniu/cortex/0.1.0/linux_amd64
+	cp terraform-provider-cortex ~/.terraform.d/plugins/registry.terraform.io/mdrobniu/cortex/0.1.0/linux_amd64/
 
 test:
 	go test ./... -v -count=1

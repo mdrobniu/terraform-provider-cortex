@@ -629,7 +629,7 @@ def write_main_tf(output_dir: str, auth_id: str):
 terraform {{
   required_providers {{
     cortex = {{
-      source  = "warlock/cortex"
+      source  = "mdrobniu/cortex"
       version = "0.1.0"
     }}
   }}
