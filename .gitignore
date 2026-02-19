@@ -1,0 +1,38 @@
+# Compiled binary
+terraform-provider-cortex
+terraform-provider-xsoar
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.backup
+*.tfplan
+.terraform.lock.hcl
+crash.log
+
+# Local development notes
+*_RESEARCH.md
+*.local.md
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Test artifacts
+/tmp/
+*.test
+cover.out
+coverage.html
+
+# Environment / secrets
+.env
+*.pem
+*.key
+terraform.tfvars
