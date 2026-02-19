@@ -41,10 +41,6 @@ signs:
       - "--detach-sign"
       - "${artifact}"
 
-extra_files:
-  - glob: terraform-registry-manifest.json
-    name_template: "{{ .ProjectName }}_{{ .Version }}_manifest.json"
-
 release:
   draft: false
   extra_files:
