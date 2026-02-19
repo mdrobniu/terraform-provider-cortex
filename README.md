@@ -1,5 +1,8 @@
 # Terraform Provider for Cortex XSOAR
 
+> **DISCLAIMER:** This software is provided "as is" without warranty of any kind.
+> Use at your own risk. See [Disclaimer & Limitation of Liability](#disclaimer--limitation-of-liability) below.
+
 A Terraform provider for managing [Palo Alto Cortex XSOAR](https://www.paloaltonetworks.com/cortex/xsoar) instance configuration as code. Supports XSOAR 6, XSOAR 8 On-Prem/Private (OPP), and XSOAR 8 SaaS deployments.
 
 ## Features
@@ -319,6 +322,33 @@ make testacc
 - HA groups, hosts, accounts, and backup config are not available
 - SaaS deployments do not support API key management or preprocessing rules via API
 
+## Disclaimer & Limitation of Liability
+
+THIS SOFTWARE IS PROVIDED "AS IS" AND "AS AVAILABLE", WITHOUT WARRANTY OF ANY
+KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, TITLE, AND NON-INFRINGEMENT.
+
+THE ENTIRE RISK AS TO THE QUALITY, PERFORMANCE, AND RESULTS OF USING THIS
+SOFTWARE REMAINS WITH YOU. THE AUTHOR(S) AND CONTRIBUTOR(S) SHALL NOT BE LIABLE
+FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, CONSEQUENTIAL, OR
+PUNITIVE DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+OR SERVICES; LOSS OF USE, DATA, PROFITS, OR BUSINESS INTERRUPTION; SYSTEM
+DOWNTIME; SECURITY BREACHES; LOSS OF OR DAMAGE TO CONFIGURATION; OR ANY
+FINANCIAL LOSS) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING
+IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
+OF SUCH DAMAGE.
+
+This provider interacts directly with your Cortex XSOAR instance and can create,
+modify, and delete configuration including but not limited to security policies,
+credentials, integration instances, jobs, and access controls. Misconfiguration
+may result in service disruption, data loss, or security exposure. You are solely
+responsible for validating all Terraform plans before applying them and for
+maintaining appropriate backups of your XSOAR configuration.
+
+This project is not affiliated with, endorsed by, or sponsored by Palo Alto
+Networks, Inc. Cortex XSOAR is a trademark of Palo Alto Networks, Inc.
+
 ## License
 
-This project is provided as-is for managing Cortex XSOAR instances via Terraform.
+MIT License. See [LICENSE](LICENSE) for the full text.
