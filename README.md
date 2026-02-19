@@ -288,6 +288,141 @@ make testacc
 - Resources read back state from the API after Create/Update for consistency
 - 404 errors in Delete are handled gracefully (resource already gone)
 
+## Debugging and Troubleshooting
+
+### Enable Debug Logging
+
+The provider uses Terraform's built-in logging framework. Set the `TF_LOG` environment variable to control log verbosity:
+
+```bash
+# Show provider debug logs (API requests, response status codes, version detection)
+TF_LOG=DEBUG terraform plan
+
+# Show full trace logs including request/response bodies (may contain sensitive data)
+TF_LOG=TRACE terraform plan
+
+# Write logs to a file for sharing
+TF_LOG=TRACE TF_LOG_PATH=./terraform-debug.log terraform plan
+```
+
+### Log Levels
+
+| Level   | What it shows                                                          |
+|---------|------------------------------------------------------------------------|
+| `ERROR` | API errors (4xx/5xx), redirect errors, exhausted retries               |
+| `WARN`  | Retryable failures (5xx), version detection fallbacks, missing tokens  |
+| `INFO`  | XSOAR version detected, deployment mode, session auth status           |
+| `DEBUG` | Every API request (method, path, attempt number, status code, body size) |
+| `TRACE` | Full request and response bodies (truncated at 2KB/4KB respectively)   |
+
+### Filter Logs to Provider Only
+
+To see only the Cortex provider logs (excluding Terraform core noise):
+
+```bash
+TF_LOG_PROVIDER=TRACE terraform plan
+TF_LOG_PROVIDER=TRACE TF_LOG_PATH=./provider-debug.log terraform plan
+```
+
+### Common Issues
+
+**"Version Detection Failed"** -- The provider could not reach `/about` or `/xsoar/about`. Verify your `base_url` is correct and the instance is reachable. For XSOAR 8, use the API URL (e.g., `https://api-xsoar8.example.com`), not the UI URL.
+
+**"Webapp Session Auth Failed"** -- The provider could not log in via the UI URL. Verify `ui_url`, `username`, and `password`. This only affects `cortex_external_storage`, `cortex_backup_schedule`, and `cortex_security_settings`.
+
+**HTTP 400 with "errOptimisticLock"** -- A concurrent modification changed the resource version. Run `terraform refresh` then retry.
+
+**HTTP 401 Unauthorized** -- Check your `api_key` and `auth_id`. For XSOAR 8, both are required.
+
+**HTTP 405 Method Not Allowed** -- The resource is not available on this XSOAR version/deployment. For example, roles are read-only on XSOAR 8, and API keys are not available on XSOAR 8 SaaS.
+
+**HTTP 303 Redirect** -- XSOAR returns 303 to signal a resource/endpoint is not available. The provider treats this as an error rather than following the redirect.
+
+### Reporting Issues
+
+When reporting an issue, please include the following information so it can be diagnosed quickly:
+
+**1. Provider and XSOAR version**
+
+```bash
+# Provider version
+terraform version
+
+# XSOAR version (from the API)
+curl -sk -H "Authorization: YOUR_API_KEY" https://YOUR_XSOAR_URL/about | python3 -m json.tool
+# For XSOAR 8, add: -H "x-xdr-auth-id: YOUR_AUTH_ID" and use /xsoar/about
+```
+
+**2. Terraform configuration** (sanitize credentials)
+
+```bash
+# Show the relevant resource block(s) from your .tf files
+# Replace sensitive values with placeholders
+```
+
+**3. Full debug log**
+
+```bash
+TF_LOG_PROVIDER=TRACE TF_LOG_PATH=./debug.log terraform apply
+# Then attach debug.log to the issue
+```
+
+> **IMPORTANT:** The trace log may contain sensitive data (API keys in headers, passwords in request bodies). Review and redact `"Authorization"` headers and any credential values before sharing.
+
+**4. Terraform plan/apply output**
+
+```bash
+terraform plan 2>&1 | tee plan-output.txt
+# or
+terraform apply 2>&1 | tee apply-output.txt
+```
+
+**5. Expected vs actual behavior** -- What did you expect to happen, and what happened instead?
+
+**6. Steps to reproduce** -- Minimal `.tf` configuration that triggers the issue.
+
+### Issue Template
+
+```
+**Provider version:** (e.g., v0.1.0)
+**XSOAR version:** (e.g., 8.9.0, deployment mode: opp)
+**Terraform version:** (e.g., 1.7.0)
+**OS:** (e.g., Ubuntu 22.04)
+
+**Resource:** (e.g., cortex_job)
+**Operation:** (e.g., create / update / delete / import)
+
+**Terraform config:**
+\`\`\`hcl
+resource "cortex_job" "example" {
+  name        = "test"
+  playbook_id = "MyPlaybook"
+  scheduled   = true
+  cron        = "0 * * * *"
+}
+\`\`\`
+
+**Error message:**
+\`\`\`
+<paste the error from terraform output>
+\`\`\`
+
+**Debug log:** (attach debug.log file)
+
+**Expected behavior:**
+<what you expected>
+
+**Actual behavior:**
+<what actually happened>
+
+**Steps to reproduce:**
+1. terraform init
+2. terraform apply
+3. <error occurs>
+```
+
+File issues at: [github.com/mdrobniu/terraform-provider-cortex/issues](https://github.com/mdrobniu/terraform-provider-cortex/issues)
+
 ## XSOAR API Notes
 
 ### XSOAR 6 endpoints

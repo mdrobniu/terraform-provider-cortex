@@ -57,9 +57,11 @@ func NewClient(baseURL, apiKey string, insecure bool) (*Client, error) {
 // DoRequest executes an HTTP request with authentication headers and retry logic.
 // Returns the response body, HTTP status code, and any error.
 func (c *Client) DoRequest(ctx context.Context, method, path string, body interface{}) ([]byte, int, error) {
+	var jsonData []byte
 	var reqBody io.Reader
 	if body != nil {
-		jsonData, err := json.Marshal(body)
+		var err error
+		jsonData, err = json.Marshal(body)
 		if err != nil {
 			return nil, 0, fmt.Errorf("marshaling request body: %w", err)
 		}
@@ -73,12 +75,16 @@ func (c *Client) DoRequest(ctx context.Context, method, path string, body interf
 
 	for attempt, delay := range retryDelays {
 		if delay > 0 {
+			tflog.Debug(ctx, fmt.Sprintf("XSOAR API retrying after %s", delay), map[string]interface{}{
+				"method":  method,
+				"path":    path,
+				"attempt": attempt + 1,
+			})
 			time.Sleep(delay)
 		}
 
 		// Re-create reader for retries
 		if attempt > 0 && body != nil {
-			jsonData, _ := json.Marshal(body)
 			reqBody = bytes.NewBuffer(jsonData)
 		}
 
@@ -96,11 +102,29 @@ func (c *Client) DoRequest(ctx context.Context, method, path string, body interf
 			req.Header.Set("x-xdr-auth-id", c.AuthID)
 		}
 
-		tflog.Debug(ctx, fmt.Sprintf("XSOAR API %s %s (attempt %d)", method, path, attempt+1))
+		tflog.Debug(ctx, "XSOAR API request", map[string]interface{}{
+			"method":  method,
+			"path":    path,
+			"attempt": attempt + 1,
+			"has_body": body != nil,
+		})
+		// Log request body at trace level (may contain sensitive data)
+		if jsonData != nil {
+			tflog.Trace(ctx, "XSOAR API request body", map[string]interface{}{
+				"path": path,
+				"body": truncateMessage(string(jsonData), 2000),
+			})
+		}
 
 		resp, err := c.HTTPClient.Do(req)
 		if err != nil {
 			lastErr = fmt.Errorf("executing request %s %s: %w", method, path, err)
+			tflog.Warn(ctx, "XSOAR API request failed", map[string]interface{}{
+				"method":  method,
+				"path":    path,
+				"attempt": attempt + 1,
+				"error":   err.Error(),
+			})
 			continue
 		}
 
@@ -111,6 +135,19 @@ func (c *Client) DoRequest(ctx context.Context, method, path string, body interf
 			continue
 		}
 
+		tflog.Debug(ctx, "XSOAR API response", map[string]interface{}{
+			"method":      method,
+			"path":        path,
+			"status_code": resp.StatusCode,
+			"body_length": len(respBody),
+		})
+		// Log response body at trace level
+		tflog.Trace(ctx, "XSOAR API response body", map[string]interface{}{
+			"path":        path,
+			"status_code": resp.StatusCode,
+			"body":        truncateMessage(string(respBody), 4000),
+		})
+
 		// Retry on 5xx errors
 		if resp.StatusCode >= 500 {
 			lastErr = &APIError{
@@ -118,6 +155,12 @@ func (c *Client) DoRequest(ctx context.Context, method, path string, body interf
 				Message:    truncateMessage(string(respBody), 500),
 				Path:       path,
 			}
+			tflog.Warn(ctx, "XSOAR API server error, will retry", map[string]interface{}{
+				"method":      method,
+				"path":        path,
+				"status_code": resp.StatusCode,
+				"attempt":     attempt + 1,
+			})
 			continue
 		}
 
@@ -128,6 +171,12 @@ func (c *Client) DoRequest(ctx context.Context, method, path string, body interf
 			if location != "" {
 				msg = fmt.Sprintf("redirect to %s: %s", location, msg)
 			}
+			tflog.Error(ctx, "XSOAR API redirect (resource not available)", map[string]interface{}{
+				"method":      method,
+				"path":        path,
+				"status_code": resp.StatusCode,
+				"location":    location,
+			})
 			return respBody, resp.StatusCode, &APIError{
 				StatusCode: resp.StatusCode,
 				Message:    msg,
@@ -137,6 +186,12 @@ func (c *Client) DoRequest(ctx context.Context, method, path string, body interf
 
 		// Return 4xx errors immediately (no retry)
 		if resp.StatusCode >= 400 {
+			tflog.Error(ctx, "XSOAR API client error", map[string]interface{}{
+				"method":      method,
+				"path":        path,
+				"status_code": resp.StatusCode,
+				"error":       truncateMessage(string(respBody), 500),
+			})
 			return respBody, resp.StatusCode, &APIError{
 				StatusCode: resp.StatusCode,
 				Message:    truncateMessage(string(respBody), 500),
@@ -147,6 +202,12 @@ func (c *Client) DoRequest(ctx context.Context, method, path string, body interf
 		return respBody, resp.StatusCode, nil
 	}
 
+	tflog.Error(ctx, "XSOAR API request failed after all retries", map[string]interface{}{
+		"method":   method,
+		"path":     path,
+		"attempts": len(retryDelays),
+		"error":    lastErr.Error(),
+	})
 	return nil, 0, fmt.Errorf("after %d attempts: %w", len(retryDelays), lastErr)
 }
 
