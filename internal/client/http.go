@@ -22,6 +22,7 @@ type Client struct {
 	HTTPClient     *http.Client
 	Version        int    // 6 or 8, detected from /about
 	DeploymentMode string // "saas", "opp", or "" (V6)
+	ProductMode    string // "xsoar", "xsiam", or "" (V6)
 }
 
 // NewClient creates a new XSOAR API client.
@@ -257,24 +258,24 @@ func (c *Client) AccountScopedPath(account, path string) string {
 	return fmt.Sprintf("/acc_%s%s", account, path)
 }
 
-// DetectVersion calls GET /about to determine the XSOAR version and deployment mode.
+// DetectVersion calls GET /about to determine the XSOAR version, deployment mode, and product mode.
 // For XSOAR 8, tries /xsoar/about as fallback if /about fails.
-// Returns: majorVersion, versionString, deploymentMode ("saas", "opp", or ""), error
-func (c *Client) DetectVersion(ctx context.Context) (int, string, string, error) {
+// Returns: majorVersion, versionString, deploymentMode ("saas", "opp", or ""), productMode ("xsoar", "xsiam", or ""), error
+func (c *Client) DetectVersion(ctx context.Context) (int, string, string, string, error) {
 	// Try standard /about first (works for V6)
 	respBody, statusCode, err := c.DoRequestRaw(ctx, "GET", "/about", nil)
 	if err != nil {
-		return 0, "", "", fmt.Errorf("detecting XSOAR version: %w", err)
+		return 0, "", "", "", fmt.Errorf("detecting XSOAR version: %w", err)
 	}
 
 	// If /about returns error or redirect, try /xsoar/about (XSOAR 8 pattern)
 	if statusCode >= 300 {
 		respBody, statusCode, err = c.DoRequestRaw(ctx, "GET", "/xsoar/about", nil)
 		if err != nil {
-			return 0, "", "", fmt.Errorf("detecting XSOAR version (V8 fallback): %w", err)
+			return 0, "", "", "", fmt.Errorf("detecting XSOAR version (V8 fallback): %w", err)
 		}
 		if statusCode >= 300 {
-			return 0, "", "", fmt.Errorf("detecting XSOAR version: both /about and /xsoar/about failed (HTTP %d)", statusCode)
+			return 0, "", "", "", fmt.Errorf("detecting XSOAR version: both /about and /xsoar/about failed (HTTP %d)", statusCode)
 		}
 	}
 
@@ -283,10 +284,10 @@ func (c *Client) DetectVersion(ctx context.Context) (int, string, string, error)
 		// If /about returned non-JSON, try /xsoar/about
 		respBody, statusCode, err = c.DoRequestRaw(ctx, "GET", "/xsoar/about", nil)
 		if err != nil {
-			return 0, "", "", fmt.Errorf("detecting XSOAR version (V8 fallback): %w", err)
+			return 0, "", "", "", fmt.Errorf("detecting XSOAR version (V8 fallback): %w", err)
 		}
 		if err := json.Unmarshal(respBody, &about); err != nil {
-			return 0, "", "", fmt.Errorf("parsing /about response: %w", err)
+			return 0, "", "", "", fmt.Errorf("parsing /about response: %w", err)
 		}
 	}
 
@@ -311,9 +312,16 @@ func (c *Client) DetectVersion(ctx context.Context) (int, string, string, error)
 		}
 	}
 
+	// Parse product mode from /about response (XSOAR 8+ only)
+	productMode := ""
+	if pm, ok := about["productMode"].(string); ok {
+		productMode = pm
+	}
+
 	c.Version = majorVer
 	c.DeploymentMode = deploymentMode
-	return majorVer, versionStr, deploymentMode, nil
+	c.ProductMode = productMode
+	return majorVer, versionStr, deploymentMode, productMode, nil
 }
 
 func truncateMessage(msg string, maxLen int) string {

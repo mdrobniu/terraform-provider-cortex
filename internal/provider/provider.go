@@ -27,13 +27,14 @@ type XSOARProvider struct {
 }
 
 type providerModel struct {
-	BaseURL  types.String `tfsdk:"base_url"`
-	APIKey   types.String `tfsdk:"api_key"`
-	AuthID   types.String `tfsdk:"auth_id"`
-	Insecure types.Bool   `tfsdk:"insecure"`
-	UIURL    types.String `tfsdk:"ui_url"`
-	Username types.String `tfsdk:"username"`
-	Password types.String `tfsdk:"password"`
+	BaseURL      types.String `tfsdk:"base_url"`
+	APIKey       types.String `tfsdk:"api_key"`
+	AuthID       types.String `tfsdk:"auth_id"`
+	Insecure     types.Bool   `tfsdk:"insecure"`
+	UIURL        types.String `tfsdk:"ui_url"`
+	Username     types.String `tfsdk:"username"`
+	Password     types.String `tfsdk:"password"`
+	SessionToken types.String `tfsdk:"session_token"`
 }
 
 // New returns a factory function for the provider.
@@ -50,7 +51,7 @@ func (p *XSOARProvider) Metadata(_ context.Context, _ provider.MetadataRequest, 
 
 func (p *XSOARProvider) Schema(_ context.Context, _ provider.SchemaRequest, resp *provider.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description: "Terraform provider for Cortex XSOAR instance configuration management.",
+		Description: "Terraform provider for Cortex XSOAR and XSIAM instance configuration management.",
 		Attributes: map[string]schema.Attribute{
 			"base_url": schema.StringAttribute{
 				Description: "The base URL of the XSOAR instance (e.g., https://xsoar.example.com). " +
@@ -90,6 +91,14 @@ func (p *XSOARProvider) Schema(_ context.Context, _ provider.SchemaRequest, resp
 				Description: "Password for XSOAR 8 OPP session auth. " +
 					"Required together with username for managing external storage and backup schedules. " +
 					"Can also be set via XSOAR_PASSWORD environment variable.",
+				Optional:  true,
+				Sensitive: true,
+			},
+			"session_token": schema.StringAttribute{
+				Description: "Session token for webapp API access on XSIAM or XSOAR 8 SaaS. " +
+					"Obtain by logging into the UI, then copying the session cookie value from browser DevTools. " +
+					"Required for correlation rules, datasets, and other webapp-managed resources. " +
+					"Can also be set via CORTEX_SESSION_TOKEN environment variable.",
 				Optional:  true,
 				Sensitive: true,
 			},
@@ -151,8 +160,8 @@ func (p *XSOARProvider) Configure(ctx context.Context, req provider.ConfigureReq
 	}
 	c.AuthID = authID
 
-	// Detect XSOAR version and deployment mode
-	majorVer, versionStr, deploymentMode, err := c.DetectVersion(ctx)
+	// Detect XSOAR version, deployment mode, and product mode
+	majorVer, versionStr, deploymentMode, productMode, err := c.DetectVersion(ctx)
 	if err != nil {
 		resp.Diagnostics.AddWarning(
 			"Version Detection Failed",
@@ -164,21 +173,28 @@ func (p *XSOARProvider) Configure(ctx context.Context, req provider.ConfigureReq
 		"version":        versionStr,
 		"major":          majorVer,
 		"deploymentMode": deploymentMode,
+		"productMode":    productMode,
 	})
+
+	// XSIAM uses V8 backend with SaaS deployment mode
+	if productMode == "xsiam" && majorVer < 8 {
+		majorVer = 8
+	}
 
 	// Select backend based on version
 	var backend api.XSOARBackend
 	switch majorVer {
 	case 8:
-		v8Backend := v8.NewBackend(c, deploymentMode)
+		v8Backend := v8.NewBackend(c, deploymentMode, productMode)
+
+		// Resolve UI URL (used for both OPP login and session token auth)
+		uiURL := os.Getenv("XSOAR_UI_URL")
+		if !config.UIURL.IsNull() && !config.UIURL.IsUnknown() {
+			uiURL = config.UIURL.ValueString()
+		}
 
 		// Set up webapp client for OPP session auth if credentials provided
-		if deploymentMode == "opp" {
-			uiURL := os.Getenv("XSOAR_UI_URL")
-			if !config.UIURL.IsNull() && !config.UIURL.IsUnknown() {
-				uiURL = config.UIURL.ValueString()
-			}
-
+		if deploymentMode == "opp" && productMode != "xsiam" {
 			username := os.Getenv("XSOAR_USERNAME")
 			if !config.Username.IsNull() && !config.Username.IsUnknown() {
 				username = config.Username.ValueString()
@@ -210,6 +226,31 @@ func (p *XSOARProvider) Configure(ctx context.Context, req provider.ConfigureReq
 			}
 		}
 
+		// Set up webapp client from session token (for XSIAM or SaaS)
+		sessionToken := os.Getenv("CORTEX_SESSION_TOKEN")
+		if !config.SessionToken.IsNull() && !config.SessionToken.IsUnknown() {
+			sessionToken = config.SessionToken.ValueString()
+		}
+		if sessionToken != "" && v8Backend.WebappClient == nil {
+			if uiURL == "" {
+				uiURL = baseURL
+			}
+			wc, err := client.NewWebappClientFromToken(uiURL, sessionToken, insecure)
+			if err != nil {
+				resp.Diagnostics.AddWarning(
+					"Session Token Auth Failed",
+					"Could not create webapp client from session token. "+
+						"Webapp-managed resources will not be available. "+
+						"Error: "+err.Error(),
+				)
+			} else {
+				v8Backend.SetWebappClient(wc)
+				tflog.Info(ctx, "Webapp session token auth established", map[string]interface{}{
+					"ui_url": uiURL,
+				})
+			}
+		}
+
 		backend = v8Backend
 	default:
 		backend = v6.NewBackend(c)
@@ -219,6 +260,7 @@ func (p *XSOARProvider) Configure(ctx context.Context, req provider.ConfigureReq
 		Client:         c,
 		Backend:        backend,
 		DeploymentMode: deploymentMode,
+		ProductMode:    productMode,
 	}
 
 	resp.DataSourceData = providerData
@@ -244,6 +286,7 @@ func (p *XSOARProvider) Resources(_ context.Context) []func() resource.Resource 
 		resources.NewExternalStorageResource,
 		resources.NewBackupScheduleResource,
 		resources.NewSecuritySettingsResource,
+		resources.NewListResource,
 	}
 }
 

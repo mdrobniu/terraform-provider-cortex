@@ -13,10 +13,12 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64default"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringdefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 )
 
 var (
@@ -46,6 +48,24 @@ type jobModel struct {
 	ShouldTriggerNew types.Bool   `tfsdk:"should_trigger_new"`
 	Tags             types.List   `tfsdk:"tags"`
 	Version          types.Int64  `tfsdk:"version"`
+	StartDate        types.String `tfsdk:"start_date"`
+	EndingDate       types.String `tfsdk:"ending_date"`
+	EndingType       types.String `tfsdk:"ending_type"`
+	HumanCron        types.Object `tfsdk:"human_cron"`
+}
+
+// humanCronModel maps the human_cron nested attribute.
+type humanCronModel struct {
+	TimePeriodType types.String `tfsdk:"time_period_type"`
+	TimePeriod     types.Int64  `tfsdk:"time_period"`
+	Days           types.List   `tfsdk:"days"`
+}
+
+// humanCronAttrTypes defines the attribute types for the human_cron object.
+var humanCronAttrTypes = map[string]attr.Type{
+	"time_period_type": types.StringType,
+	"time_period":      types.Int64Type,
+	"days":             types.ListType{ElemType: types.StringType},
 }
 
 func (r *JobResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -54,7 +74,7 @@ func (r *JobResource) Metadata(_ context.Context, req resource.MetadataRequest, 
 
 func (r *JobResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description: "Manages an XSOAR scheduled job.",
+		Description: "Manages an XSOAR/XSIAM scheduled job.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Description: "The unique identifier of the job.",
@@ -85,7 +105,7 @@ func (r *JobResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 				Default:     booldefault.StaticBool(false),
 			},
 			"cron": schema.StringAttribute{
-				Description: "The cron schedule expression.",
+				Description: "The cron schedule expression (XSOAR 6/8). Not used on XSIAM; use human_cron instead.",
 				Optional:    true,
 			},
 			"recurrent": schema.BoolAttribute{
@@ -108,6 +128,42 @@ func (r *JobResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 			"version": schema.Int64Attribute{
 				Description: "The current version of the job (used for optimistic concurrency).",
 				Computed:    true,
+			},
+			"start_date": schema.StringAttribute{
+				Description: "The start date for the job schedule in ISO 8601 format (e.g., 2026-03-01T00:00:00Z). Required on XSIAM.",
+				Optional:    true,
+			},
+			"ending_date": schema.StringAttribute{
+				Description: "The ending date for the job schedule in ISO 8601 format. Defaults to start_date value.",
+				Optional:    true,
+				Computed:    true,
+			},
+			"ending_type": schema.StringAttribute{
+				Description: "When the job should stop running. Valid values: never, by_date.",
+				Optional:    true,
+				Computed:    true,
+				Default:     stringdefault.StaticString("never"),
+			},
+			"human_cron": schema.SingleNestedAttribute{
+				Description: "Human-readable cron schedule (required on XSIAM, optional on XSOAR). Defines the job repeat interval.",
+				Optional:    true,
+				Attributes: map[string]schema.Attribute{
+					"time_period_type": schema.StringAttribute{
+						Description: "The time period unit: minutes, hours, days, weeks, months.",
+						Required:    true,
+					},
+					"time_period": schema.Int64Attribute{
+						Description: "The interval value (e.g., 1 = every 1 hour when time_period_type is hours).",
+						Optional:    true,
+						Computed:    true,
+						Default:     int64default.StaticInt64(1),
+					},
+					"days": schema.ListAttribute{
+						Description: "Days of the week to run: SUN, MON, TUE, WED, THU, FRI, SAT. If omitted, runs every day.",
+						Optional:    true,
+						ElementType: types.StringType,
+					},
+				},
 			},
 		},
 	}
@@ -268,6 +324,38 @@ func (r *JobResource) buildPayload(ctx context.Context, plan *jobModel) map[stri
 		payload["tags"] = tags
 	}
 
+	if !plan.StartDate.IsNull() && !plan.StartDate.IsUnknown() {
+		payload["startDate"] = plan.StartDate.ValueString()
+	}
+
+	if !plan.EndingDate.IsNull() && !plan.EndingDate.IsUnknown() {
+		payload["endingDate"] = plan.EndingDate.ValueString()
+	} else if !plan.StartDate.IsNull() && !plan.StartDate.IsUnknown() {
+		// Default endingDate to startDate if not specified
+		payload["endingDate"] = plan.StartDate.ValueString()
+	}
+
+	if !plan.EndingType.IsNull() && !plan.EndingType.IsUnknown() {
+		payload["endingType"] = plan.EndingType.ValueString()
+	}
+
+	// Build humanCron from nested object
+	if !plan.HumanCron.IsNull() && !plan.HumanCron.IsUnknown() {
+		var hc humanCronModel
+		diags := plan.HumanCron.As(ctx, &hc, basetypes.ObjectAsOptions{})
+		if !diags.HasError() {
+			humanCron := map[string]interface{}{
+				"timePeriodType": hc.TimePeriodType.ValueString(),
+				"timePeriod":     hc.TimePeriod.ValueInt64(),
+			}
+			days := extractStringList(ctx, hc.Days)
+			if days != nil {
+				humanCron["days"] = days
+			}
+			payload["humanCron"] = humanCron
+		}
+	}
+
 	return payload
 }
 
@@ -328,6 +416,75 @@ func (r *JobResource) readJobIntoModel(ctx context.Context, name string, model *
 		model.Tags = listVal
 	} else if !model.Tags.IsNull() {
 		model.Tags = types.ListNull(types.StringType)
+	}
+
+	// Start date / ending date / ending type
+	zeroDate := "0001-01-01T00:00:00Z"
+	epochDate := "1970-01-01T00:00:00Z"
+	if found.StartDate != "" && found.StartDate != zeroDate && found.StartDate != epochDate {
+		model.StartDate = types.StringValue(found.StartDate)
+	} else if model.StartDate.IsNull() {
+		// Keep null
+	} else {
+		model.StartDate = types.StringNull()
+	}
+
+	if found.EndingDate != "" && found.EndingDate != zeroDate && found.EndingDate != epochDate {
+		model.EndingDate = types.StringValue(found.EndingDate)
+	} else if model.EndingDate.IsNull() {
+		// Keep null
+	} else {
+		model.EndingDate = types.StringNull()
+	}
+
+	if found.EndingType != "" {
+		model.EndingType = types.StringValue(found.EndingType)
+	}
+
+	// Human cron
+	if found.HumanCron != nil && len(found.HumanCron) > 0 {
+		attrs := map[string]attr.Value{}
+
+		if tpt, ok := found.HumanCron["timePeriodType"].(string); ok {
+			attrs["time_period_type"] = types.StringValue(tpt)
+		} else {
+			attrs["time_period_type"] = types.StringValue("")
+		}
+
+		switch tp := found.HumanCron["timePeriod"].(type) {
+		case float64:
+			attrs["time_period"] = types.Int64Value(int64(tp))
+		default:
+			attrs["time_period"] = types.Int64Value(1)
+		}
+
+		if daysRaw, ok := found.HumanCron["days"].([]interface{}); ok && len(daysRaw) > 0 {
+			dayElements := make([]attr.Value, len(daysRaw))
+			for i, d := range daysRaw {
+				if s, ok := d.(string); ok {
+					dayElements[i] = types.StringValue(s)
+				}
+			}
+			dayList, d := types.ListValue(types.StringType, dayElements)
+			diags.Append(d...)
+			if diags.HasError() {
+				return diags
+			}
+			attrs["days"] = dayList
+		} else {
+			attrs["days"] = types.ListNull(types.StringType)
+		}
+
+		objVal, d := types.ObjectValue(humanCronAttrTypes, attrs)
+		diags.Append(d...)
+		if diags.HasError() {
+			return diags
+		}
+		model.HumanCron = objVal
+	} else if model.HumanCron.IsNull() {
+		// Keep null
+	} else {
+		model.HumanCron = types.ObjectNull(humanCronAttrTypes)
 	}
 
 	return diags

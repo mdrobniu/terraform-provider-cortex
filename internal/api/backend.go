@@ -6,6 +6,7 @@ type ServerInfo struct {
 	MajorVer       int
 	BuildNum       string
 	DeploymentMode string // "saas", "opp", or "" (V6)
+	ProductMode    string // "xsoar", "xsiam", or "" (V6)
 }
 
 // IntegrationConfig represents an available integration type (brand).
@@ -98,6 +99,7 @@ type Job struct {
 	Closing          bool
 	ShouldTriggerNew bool
 	Tags             []string
+	HumanCron        map[string]interface{} // XSIAM: {timePeriodType, timePeriod, days}
 }
 
 // PreprocessingRule represents a pre-processing rule.
@@ -219,6 +221,15 @@ type SecuritySettings struct {
 	LimitAPIAccess         bool
 }
 
+// List represents a stored list (IP lists, CSV tables, JSON config, etc.).
+type List struct {
+	ID      string
+	Version int
+	Name    string
+	Type    string // "plain_text", "json", "html", "markdown", "css"
+	Data    string
+}
+
 // XSOARBackend defines the interface each XSOAR version must implement.
 type XSOARBackend interface {
 	// Server
@@ -313,4 +324,10 @@ type XSOARBackend interface {
 	// Security Settings (XSOAR 8 OPP only, requires session auth)
 	GetSecuritySettings() (*SecuritySettings, error)
 	UpdateSecuritySettings(settings map[string]interface{}) (*SecuritySettings, error)
+
+	// Lists
+	GetList(name string) (*List, error)
+	CreateList(list map[string]interface{}) (*List, error)
+	UpdateList(list map[string]interface{}) (*List, error)
+	DeleteList(name string) error
 }

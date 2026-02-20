@@ -10,4 +10,5 @@ type ProviderData struct {
 	Client         *client.Client
 	Backend        api.XSOARBackend
 	DeploymentMode string // "saas", "opp", or "" (V6)
+	ProductMode    string // "xsoar", "xsiam", or "" (V6)
 }

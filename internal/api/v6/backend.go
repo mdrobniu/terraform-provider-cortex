@@ -426,6 +426,9 @@ func (b *Backend) SearchJobs() ([]api.Job, error) {
 			Cron:             getString(jm, "cron"),
 			Recurrent:        getBool(jm, "recurrent"),
 			ShouldTriggerNew: getBool(jm, "shouldTriggerNew"),
+			StartDate:        getString(jm, "startDate"),
+			EndingDate:       getString(jm, "endingDate"),
+			EndingType:       getString(jm, "endingType"),
 		}
 		if v, ok := jm["version"].(float64); ok {
 			job.Version = int(v)
@@ -436,6 +439,9 @@ func (b *Backend) SearchJobs() ([]api.Job, error) {
 					job.Tags = append(job.Tags, s)
 				}
 			}
+		}
+		if hc, ok := jm["humanCron"].(map[string]interface{}); ok && len(hc) > 0 {
+			job.HumanCron = hc
 		}
 		jobs = append(jobs, job)
 	}
@@ -992,6 +998,72 @@ func (b *Backend) GetSecuritySettings() (*api.SecuritySettings, error) {
 
 func (b *Backend) UpdateSecuritySettings(settings map[string]interface{}) (*api.SecuritySettings, error) {
 	return nil, fmt.Errorf("security settings management is not available on XSOAR 6")
+}
+
+// --- Lists ---
+
+func (b *Backend) GetList(name string) (*api.List, error) {
+	// Get metadata from /lists to find version
+	body, _, err := b.Client.DoRequest(b.Ctx, "GET", "/lists", nil)
+	if err != nil {
+		return nil, err
+	}
+	var allLists []map[string]interface{}
+	if err := json.Unmarshal(body, &allLists); err != nil {
+		return nil, fmt.Errorf("parsing lists: %w", err)
+	}
+	var listMeta map[string]interface{}
+	for _, l := range allLists {
+		if getString(l, "name") == name {
+			listMeta = l
+			break
+		}
+	}
+	if listMeta == nil {
+		return nil, &client.APIError{StatusCode: 404, Message: fmt.Sprintf("list %q not found", name)}
+	}
+
+	// Get data from /lists/download/{name}
+	dataBody, _, err := b.Client.DoRequestRaw(b.Ctx, "GET", "/lists/download/"+name, nil)
+	if err != nil {
+		return nil, fmt.Errorf("downloading list data: %w", err)
+	}
+
+	return &api.List{
+		ID:      getString(listMeta, "id"),
+		Version: getInt(listMeta, "version"),
+		Name:    getString(listMeta, "name"),
+		Type:    getString(listMeta, "type"),
+		Data:    string(dataBody),
+	}, nil
+}
+
+func (b *Backend) CreateList(list map[string]interface{}) (*api.List, error) {
+	body, _, err := b.Client.DoRequest(b.Ctx, "POST", "/lists/save", list)
+	if err != nil {
+		return nil, err
+	}
+	var resp map[string]interface{}
+	if err := json.Unmarshal(body, &resp); err != nil {
+		return nil, fmt.Errorf("parsing list save response: %w", err)
+	}
+	return &api.List{
+		ID:      getString(resp, "id"),
+		Version: getInt(resp, "version"),
+		Name:    getString(resp, "name"),
+		Type:    getString(resp, "type"),
+	}, nil
+}
+
+func (b *Backend) UpdateList(list map[string]interface{}) (*api.List, error) {
+	return b.CreateList(list) // Same endpoint for create and update
+}
+
+func (b *Backend) DeleteList(name string) error {
+	_, _, err := b.Client.DoRequest(b.Ctx, "POST", "/lists/delete", map[string]interface{}{
+		"id": name,
+	})
+	return err
 }
 
 // --- Helper functions ---

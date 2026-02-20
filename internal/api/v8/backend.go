@@ -9,23 +9,25 @@ import (
 	"terraform-provider-cortex/internal/client"
 )
 
-// Backend implements api.XSOARBackend for XSOAR 8.
-// All API paths are prefixed with /xsoar/ for the XSOAR 8 OPP architecture.
+// Backend implements api.XSOARBackend for XSOAR 8 and XSIAM.
+// All API paths are prefixed with /xsoar/ for the XSOAR 8/XSIAM architecture.
 type Backend struct {
 	Client         *client.Client
-	WebappClient   *client.WebappClient // optional, for /api/webapp/ endpoints (OPP session auth)
+	WebappClient   *client.WebappClient // optional, for /api/webapp/ endpoints (session auth)
 	Ctx            context.Context
 	prefix         string // "/xsoar"
 	deploymentMode string // "saas", "opp", or ""
+	productMode    string // "xsoar", "xsiam", or ""
 }
 
 // NewBackend creates a new V8 backend.
-func NewBackend(c *client.Client, deploymentMode string) *Backend {
+func NewBackend(c *client.Client, deploymentMode, productMode string) *Backend {
 	return &Backend{
 		Client:         c,
 		Ctx:            context.Background(),
 		prefix:         "/xsoar",
 		deploymentMode: deploymentMode,
+		productMode:    productMode,
 	}
 }
 
@@ -39,8 +41,16 @@ func (b *Backend) isSaaS() bool {
 	return b.deploymentMode == "saas"
 }
 
+// isXSIAM returns true if this is an XSIAM instance.
+func (b *Backend) isXSIAM() bool {
+	return b.productMode == "xsiam"
+}
+
 // modeLabel returns a human-readable deployment mode label for error messages.
 func (b *Backend) modeLabel() string {
+	if b.isXSIAM() {
+		return "XSIAM"
+	}
 	if b.isSaaS() {
 		return "XSOAR 8 SaaS"
 	}
@@ -71,11 +81,15 @@ func (b *Backend) GetServerInfo() (*api.ServerInfo, error) {
 		BuildNum:       getString(resp, "buildNum"),
 		MajorVer:       8,
 		DeploymentMode: b.deploymentMode,
+		ProductMode:    b.productMode,
 	}
 	return info, nil
 }
 
 func (b *Backend) GetServerConfig() (map[string]interface{}, int, error) {
+	if b.isXSIAM() {
+		return nil, 0, fmt.Errorf("system/config is blocked on %s; this endpoint is not available for public API requests", b.modeLabel())
+	}
 	body, _, err := b.Client.DoRequest(b.Ctx, "GET", b.p("/system/config"), nil)
 	if err != nil {
 		return nil, 0, err
@@ -93,6 +107,9 @@ func (b *Backend) GetServerConfig() (map[string]interface{}, int, error) {
 }
 
 func (b *Backend) UpdateServerConfig(config map[string]string, version int) error {
+	if b.isXSIAM() {
+		return fmt.Errorf("system/config is blocked on %s; this endpoint is not available for public API requests", b.modeLabel())
+	}
 	payload := map[string]interface{}{
 		"data":    config,
 		"version": version,
@@ -442,6 +459,9 @@ func (b *Backend) SearchJobs() ([]api.Job, error) {
 			Cron:             getString(jm, "cron"),
 			Recurrent:        getBool(jm, "recurrent"),
 			ShouldTriggerNew: getBool(jm, "shouldTriggerNew"),
+			StartDate:        getString(jm, "startDate"),
+			EndingDate:       getString(jm, "endingDate"),
+			EndingType:       getString(jm, "endingType"),
 		}
 		if v, ok := jm["version"].(float64); ok {
 			job.Version = int(v)
@@ -452,6 +472,9 @@ func (b *Backend) SearchJobs() ([]api.Job, error) {
 					job.Tags = append(job.Tags, s)
 				}
 			}
+		}
+		if hc, ok := jm["humanCron"].(map[string]interface{}); ok && len(hc) > 0 {
+			job.HumanCron = hc
 		}
 		jobs = append(jobs, job)
 	}
@@ -815,10 +838,16 @@ func (b *Backend) UpdateBackupConfig(config map[string]interface{}) (*api.Backup
 // Available on XSOAR 8 OPP only, requires session auth (webapp client).
 
 func (b *Backend) requireWebapp(operation string) error {
-	if b.isSaaS() {
-		return fmt.Errorf("%s is not available on %s", operation, b.modeLabel())
+	if b.isSaaS() && !b.isXSIAM() {
+		// XSOAR 8 SaaS without session token
+		if b.WebappClient == nil {
+			return fmt.Errorf("%s is not available on %s without session_token", operation, b.modeLabel())
+		}
 	}
-	if b.WebappClient == nil {
+	if b.isXSIAM() && b.WebappClient == nil {
+		return fmt.Errorf("%s requires session_token on %s; configure session_token in the provider", operation, b.modeLabel())
+	}
+	if !b.isSaaS() && !b.isXSIAM() && b.WebappClient == nil {
 		return fmt.Errorf("%s requires session auth; configure ui_url, username, and password in the provider", operation)
 	}
 	return nil
@@ -1090,6 +1119,72 @@ func (b *Backend) UpdateSecuritySettings(settings map[string]interface{}) (*api.
 		return nil, err
 	}
 	return b.GetSecuritySettings()
+}
+
+// --- Lists ---
+
+func (b *Backend) GetList(name string) (*api.List, error) {
+	// Get metadata from /lists to find version
+	body, _, err := b.Client.DoRequest(b.Ctx, "GET", b.p("/lists"), nil)
+	if err != nil {
+		return nil, err
+	}
+	var allLists []map[string]interface{}
+	if err := json.Unmarshal(body, &allLists); err != nil {
+		return nil, fmt.Errorf("parsing lists: %w", err)
+	}
+	var listMeta map[string]interface{}
+	for _, l := range allLists {
+		if getString(l, "name") == name {
+			listMeta = l
+			break
+		}
+	}
+	if listMeta == nil {
+		return nil, &client.APIError{StatusCode: 404, Message: fmt.Sprintf("list %q not found", name)}
+	}
+
+	// Get data from /lists/download/{name}
+	dataBody, _, err := b.Client.DoRequestRaw(b.Ctx, "GET", b.p("/lists/download/"+name), nil)
+	if err != nil {
+		return nil, fmt.Errorf("downloading list data: %w", err)
+	}
+
+	return &api.List{
+		ID:      getString(listMeta, "id"),
+		Version: getInt(listMeta, "version"),
+		Name:    getString(listMeta, "name"),
+		Type:    getString(listMeta, "type"),
+		Data:    string(dataBody),
+	}, nil
+}
+
+func (b *Backend) CreateList(list map[string]interface{}) (*api.List, error) {
+	body, _, err := b.Client.DoRequest(b.Ctx, "POST", b.p("/lists/save"), list)
+	if err != nil {
+		return nil, err
+	}
+	var resp map[string]interface{}
+	if err := json.Unmarshal(body, &resp); err != nil {
+		return nil, fmt.Errorf("parsing list save response: %w", err)
+	}
+	return &api.List{
+		ID:      getString(resp, "id"),
+		Version: getInt(resp, "version"),
+		Name:    getString(resp, "name"),
+		Type:    getString(resp, "type"),
+	}, nil
+}
+
+func (b *Backend) UpdateList(list map[string]interface{}) (*api.List, error) {
+	return b.CreateList(list) // Same endpoint for create and update
+}
+
+func (b *Backend) DeleteList(name string) error {
+	_, _, err := b.Client.DoRequest(b.Ctx, "POST", b.p("/lists/delete"), map[string]interface{}{
+		"id": name,
+	})
+	return err
 }
 
 // --- Helper functions ---

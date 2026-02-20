@@ -65,6 +65,59 @@ func NewWebappClient(ctx context.Context, uiURL, username, password string, inse
 	return wc, nil
 }
 
+// NewWebappClientFromToken creates a webapp client using a pre-obtained session cookie string.
+// This is used for XSIAM and XSOAR 8 SaaS where SSO login is required and the user
+// provides a session token extracted from browser DevTools.
+func NewWebappClientFromToken(uiURL, sessionToken string, insecure bool) (*WebappClient, error) {
+	uiURL = strings.TrimRight(uiURL, "/")
+
+	jar, err := cookiejar.New(nil)
+	if err != nil {
+		return nil, fmt.Errorf("creating cookie jar: %w", err)
+	}
+
+	transport := &http.Transport{
+		TLSClientConfig: &tls.Config{
+			InsecureSkipVerify: insecure,
+		},
+		MaxIdleConns:        10,
+		IdleConnTimeout:     30 * time.Second,
+		TLSHandshakeTimeout: 10 * time.Second,
+	}
+
+	httpClient := &http.Client{
+		Transport: transport,
+		Timeout:   60 * time.Second,
+		Jar:       jar,
+	}
+
+	// Parse the UI URL to set cookies on the correct domain
+	parsedURL, err := url.Parse(uiURL)
+	if err != nil {
+		return nil, fmt.Errorf("parsing UI URL: %w", err)
+	}
+
+	// Set the session token as cookies on the UI domain
+	cookies := []*http.Cookie{
+		{
+			Name:  "app-proxy-hydra-prod-us",
+			Value: sessionToken,
+			Path:  "/",
+		},
+		{
+			Name:  "app-hub",
+			Value: sessionToken,
+			Path:  "/",
+		},
+	}
+	jar.SetCookies(parsedURL, cookies)
+
+	return &WebappClient{
+		UIURL:      uiURL,
+		HTTPClient: httpClient,
+	}, nil
+}
+
 // login performs the two-step login flow to obtain session cookies.
 func (wc *WebappClient) login(ctx context.Context, username, password string) error {
 	tflog.Debug(ctx, "Webapp: logging in", map[string]interface{}{"ui_url": wc.UIURL, "username": username})
