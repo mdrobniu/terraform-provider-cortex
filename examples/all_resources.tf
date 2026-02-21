@@ -377,3 +377,100 @@ resource "cortex_security_settings" "main" {
   external_ip_monitoring     = true   # Monitor external IP access
   limit_api_access           = false  # Limit API access to approved IPs
 }
+
+# =============================================================================
+# XSIAM Configuration Resources (require session_token)
+# =============================================================================
+
+# --- cortex_parsing_rules (singleton) ---
+# Manages the full text of XQL parsing rules. Uses hash-based optimistic locking.
+
+resource "cortex_parsing_rules" "main" {
+  text = <<-EOT
+    [INGEST:vendor="custom", product="myapp", target_dataset="custom_myapp", no_hit=drop]
+    alter _raw_log = to_string(_raw_log)
+    | alter src_ip = arrayindex(regextract(_raw_log, "src=(\d+\.\d+\.\d+\.\d+)"), 0);
+  EOT
+}
+
+# --- cortex_data_modeling_rules (singleton) ---
+# Manages the full text of XQL data modeling rules. Uses hash-based optimistic locking.
+
+resource "cortex_data_modeling_rules" "main" {
+  text = <<-EOT
+    [MODEL: dataset="custom_myapp"]
+    alter xdm.event.type = "APP_EVENT"
+    | alter xdm.source.ipv4 = src_ip;
+  EOT
+}
+
+# --- cortex_auto_upgrade_settings (singleton) ---
+# Configures XDR collector auto-upgrade global settings.
+# Delete is a no-op (settings persist on the tenant).
+
+resource "cortex_auto_upgrade_settings" "main" {
+  batch_size = 500               # Agents per upgrade batch
+  start_time = "02:00"           # Upgrade window start (optional, null = anytime)
+  end_time   = "06:00"           # Upgrade window end (optional, null = anytime)
+  days       = ["Saturday", "Sunday"]  # Days for upgrades (optional, null = all days)
+}
+
+# --- cortex_collector_group (per-group) ---
+# No update API; all mutable fields force replacement.
+
+resource "cortex_collector_group" "example" {
+  name        = "Syslog Collectors"        # Group display name (ForceNew)
+  description = "Syslog data collectors"   # Description (ForceNew)
+  type        = "STATIC"                   # "STATIC" or "DYNAMIC" (ForceNew)
+  # filter    = jsonencode({...})          # JSON filter for DYNAMIC groups (ForceNew)
+}
+
+# --- cortex_collector_distribution (per-dist) ---
+# No update API; all fields force replacement. Delete removes the distribution.
+
+resource "cortex_collector_distribution" "example" {
+  name          = "Linux Collector v1.5"    # Distribution name (ForceNew)
+  description   = "Production Linux pkg"   # Description (ForceNew)
+  agent_version = "1.5.1.2048"             # Collector agent version (ForceNew)
+  platform      = "AGENT_OS_LINUX"         # AGENT_OS_WINDOWS or AGENT_OS_LINUX (ForceNew)
+  package_type  = "SCOUTER_INSTALLER"      # Package type (default: SCOUTER_INSTALLER)
+}
+
+# --- cortex_collector_profile (per-profile) ---
+# Create-only: no update or delete API. Delete removes from Terraform state only.
+
+resource "cortex_collector_profile" "example" {
+  name         = "Custom Linux Profile"             # Profile name (ForceNew)
+  description  = "Custom syslog config"             # Description (ForceNew)
+  platform     = "AGENT_OS_LINUX"                   # AGENT_OS_WINDOWS or AGENT_OS_LINUX (ForceNew)
+  profile_type = "STANDARD"                         # Profile type (default: STANDARD)
+  is_default   = false                              # Whether this is the default profile
+  modules      = "IyBiYXNlNjQtZW5jb2RlZCBZQU1M"   # Base64-encoded YAML modules (ForceNew)
+}
+
+# --- cortex_asm_asset_removal (bulk, irreversible) ---
+# Fire-and-forget: assets removed on create. Delete is no-op.
+# WARNING: Asset removal is irreversible. terraform destroy will NOT restore assets.
+
+# resource "cortex_asm_asset_removal" "decommissioned" {
+#   assets = [
+#     {
+#       asset_type = "Domain"                  # Domain, IP_RANGE, or Certificate
+#       asset_name = "old-app.example.com"     # Asset identifier
+#     },
+#     {
+#       asset_type = "IP_RANGE"
+#       asset_name = "10.99.0.0/16"
+#     }
+#   ]
+# }
+
+# =============================================================================
+# XSIAM Data Sources (read-only, require session_token)
+# =============================================================================
+
+data "cortex_datasets" "all" {}
+
+data "cortex_broker_vms" "all" {}
+
+data "cortex_collector_policies" "all" {}

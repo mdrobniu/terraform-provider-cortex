@@ -468,7 +468,7 @@ func (b *Backend) CreateJob(job map[string]interface{}) (*api.Job, error) {
 }
 
 func (b *Backend) UpdateJob(job map[string]interface{}) (*api.Job, error) {
-	body, _, err := b.Client.DoRequest(b.Ctx, "PUT", "/jobs", job)
+	body, _, err := b.Client.DoRequest(b.Ctx, "POST", "/jobs", job)
 	if err != nil {
 		return nil, err
 	}
@@ -1064,6 +1064,420 @@ func (b *Backend) DeleteList(name string) error {
 		"id": name,
 	})
 	return err
+}
+
+// --- Correlation Rules ---
+// Not available on XSOAR 6.
+
+func (b *Backend) ListCorrelationRules() ([]api.CorrelationRule, error) {
+	return nil, fmt.Errorf("correlation rules are not available on XSOAR 6")
+}
+
+func (b *Backend) GetCorrelationRule(ruleID int) (*api.CorrelationRule, error) {
+	return nil, fmt.Errorf("correlation rules are not available on XSOAR 6")
+}
+
+func (b *Backend) CreateCorrelationRule(rule map[string]interface{}) (*api.CorrelationRule, error) {
+	return nil, fmt.Errorf("correlation rules are not available on XSOAR 6")
+}
+
+func (b *Backend) UpdateCorrelationRule(ruleID int, rule map[string]interface{}) (*api.CorrelationRule, error) {
+	return nil, fmt.Errorf("correlation rules are not available on XSOAR 6")
+}
+
+func (b *Backend) DeleteCorrelationRule(ruleID int) error {
+	return fmt.Errorf("correlation rules are not available on XSOAR 6")
+}
+
+// --- IOC Rules ---
+// Not available on XSOAR 6.
+
+func (b *Backend) ListIOCRules() ([]api.IOCRule, error) {
+	return nil, fmt.Errorf("IOC rules are not available on XSOAR 6")
+}
+
+func (b *Backend) GetIOCRule(ruleID int) (*api.IOCRule, error) {
+	return nil, fmt.Errorf("IOC rules are not available on XSOAR 6")
+}
+
+func (b *Backend) CreateIOCRule(rule map[string]interface{}) (*api.IOCRule, error) {
+	return nil, fmt.Errorf("IOC rules are not available on XSOAR 6")
+}
+
+func (b *Backend) DeleteIOCRule(ruleID int) error {
+	return fmt.Errorf("IOC rules are not available on XSOAR 6")
+}
+
+// --- EDL Config ---
+// Not available on XSOAR 6.
+
+func (b *Backend) GetEDLConfig() (*api.EDLConfig, error) {
+	return nil, fmt.Errorf("EDL configuration is not available on XSOAR 6")
+}
+
+func (b *Backend) UpdateEDLConfig(config map[string]interface{}) (*api.EDLConfig, error) {
+	return nil, fmt.Errorf("EDL configuration is not available on XSOAR 6")
+}
+
+// --- Vulnerability Scan Settings ---
+// Not available on XSOAR 6.
+
+func (b *Backend) GetVulnerabilityScanSettings() (*api.VulnerabilityScanSettings, error) {
+	return nil, fmt.Errorf("vulnerability scan settings are not available on XSOAR 6")
+}
+
+func (b *Backend) UpdateVulnerabilityScanSettings(settings map[string]interface{}) (*api.VulnerabilityScanSettings, error) {
+	return nil, fmt.Errorf("vulnerability scan settings are not available on XSOAR 6")
+}
+
+// --- Device Control Classes ---
+// Not available on XSOAR 6.
+
+func (b *Backend) ListDeviceControlClasses() ([]api.DeviceControlClass, error) {
+	return nil, fmt.Errorf("device control classes are not available on XSOAR 6")
+}
+
+func (b *Backend) CreateDeviceControlClass(class map[string]interface{}) (*api.DeviceControlClass, error) {
+	return nil, fmt.Errorf("device control classes are not available on XSOAR 6")
+}
+
+func (b *Backend) DeleteDeviceControlClass(identifier string) error {
+	return fmt.Errorf("device control classes are not available on XSOAR 6")
+}
+
+// --- Custom Statuses ---
+// Not available on XSOAR 6.
+
+func (b *Backend) ListCustomStatuses() ([]api.CustomStatus, error) {
+	return nil, fmt.Errorf("custom statuses are not available on XSOAR 6")
+}
+
+func (b *Backend) CreateCustomStatus(status map[string]interface{}) (*api.CustomStatus, error) {
+	return nil, fmt.Errorf("custom statuses are not available on XSOAR 6")
+}
+
+func (b *Backend) DeleteCustomStatus(enumName string) error {
+	return fmt.Errorf("custom statuses are not available on XSOAR 6")
+}
+
+// --- Agent Groups ---
+// Not available on XSOAR 6.
+
+func (b *Backend) ListAgentGroups() ([]api.AgentGroup, error) {
+	return nil, fmt.Errorf("agent groups are not available on XSOAR 6")
+}
+
+func (b *Backend) GetAgentGroup(groupID int) (*api.AgentGroup, error) {
+	return nil, fmt.Errorf("agent groups are not available on XSOAR 6")
+}
+
+func (b *Backend) CreateAgentGroup(group map[string]interface{}) (*api.AgentGroup, error) {
+	return nil, fmt.Errorf("agent groups are not available on XSOAR 6")
+}
+
+func (b *Backend) UpdateAgentGroup(groupID int, group map[string]interface{}) (*api.AgentGroup, error) {
+	return nil, fmt.Errorf("agent groups are not available on XSOAR 6")
+}
+
+func (b *Backend) DeleteAgentGroup(groupID int) error {
+	return fmt.Errorf("agent groups are not available on XSOAR 6")
+}
+
+// --- Incident Domains ---
+// Not available on XSOAR 6.
+
+func (b *Backend) ListIncidentDomains() ([]api.IncidentDomain, error) {
+	return nil, fmt.Errorf("incident domains are not available on XSOAR 6")
+}
+
+func (b *Backend) GetIncidentDomain(domainID int) (*api.IncidentDomain, error) {
+	return nil, fmt.Errorf("incident domains are not available on XSOAR 6")
+}
+
+func (b *Backend) CreateIncidentDomain(domain map[string]interface{}) (*api.IncidentDomain, error) {
+	return nil, fmt.Errorf("incident domains are not available on XSOAR 6")
+}
+
+func (b *Backend) UpdateIncidentDomain(domainID int, domain map[string]interface{}) (*api.IncidentDomain, error) {
+	return nil, fmt.Errorf("incident domains are not available on XSOAR 6")
+}
+
+func (b *Backend) DeleteIncidentDomain(domainID int) error {
+	return fmt.Errorf("incident domains are not available on XSOAR 6")
+}
+
+// --- TIM Rules ---
+// Not available on XSOAR 6.
+
+func (b *Backend) ListTIMRules() ([]api.TIMRule, error) {
+	return nil, fmt.Errorf("TIM rules are not available on XSOAR 6")
+}
+
+func (b *Backend) GetTIMRule(ruleID int) (*api.TIMRule, error) {
+	return nil, fmt.Errorf("TIM rules are not available on XSOAR 6")
+}
+
+func (b *Backend) CreateTIMRule(rule map[string]interface{}) (*api.TIMRule, error) {
+	return nil, fmt.Errorf("TIM rules are not available on XSOAR 6")
+}
+
+func (b *Backend) UpdateTIMRule(ruleID int, rule map[string]interface{}) (*api.TIMRule, error) {
+	return nil, fmt.Errorf("TIM rules are not available on XSOAR 6")
+}
+
+func (b *Backend) DeleteTIMRule(ruleID int) error {
+	return fmt.Errorf("TIM rules are not available on XSOAR 6")
+}
+
+// --- Attack Surface Rules ---
+// Not available on XSOAR 6.
+
+func (b *Backend) ListAttackSurfaceRules() ([]api.AttackSurfaceRule, error) {
+	return nil, fmt.Errorf("attack surface rules are not available on XSOAR 6")
+}
+
+func (b *Backend) GetAttackSurfaceRule(issueTypeID string) (*api.AttackSurfaceRule, error) {
+	return nil, fmt.Errorf("attack surface rules are not available on XSOAR 6")
+}
+
+func (b *Backend) UpdateAttackSurfaceRule(issueTypeID string, rule map[string]interface{}) (*api.AttackSurfaceRule, error) {
+	return nil, fmt.Errorf("attack surface rules are not available on XSOAR 6")
+}
+
+// --- BIOC Rules ---
+// Not available on XSOAR 6.
+
+func (b *Backend) ListBIOCRules() ([]api.BIOCRule, error) {
+	return nil, fmt.Errorf("BIOC rules are not available on XSOAR 6")
+}
+
+func (b *Backend) GetBIOCRule(ruleID int) (*api.BIOCRule, error) {
+	return nil, fmt.Errorf("BIOC rules are not available on XSOAR 6")
+}
+
+func (b *Backend) CreateBIOCRule(rule map[string]interface{}) (*api.BIOCRule, error) {
+	return nil, fmt.Errorf("BIOC rules are not available on XSOAR 6")
+}
+
+func (b *Backend) UpdateBIOCRule(ruleID int, rule map[string]interface{}) (*api.BIOCRule, error) {
+	return nil, fmt.Errorf("BIOC rules are not available on XSOAR 6")
+}
+
+func (b *Backend) DeleteBIOCRule(ruleID int) error {
+	return fmt.Errorf("BIOC rules are not available on XSOAR 6")
+}
+
+// --- Rules Exceptions ---
+// Not available on XSOAR 6.
+
+func (b *Backend) ListRulesExceptions() ([]api.RulesException, error) {
+	return nil, fmt.Errorf("rules exceptions are not available on XSOAR 6")
+}
+
+func (b *Backend) GetRulesException(ruleID int) (*api.RulesException, error) {
+	return nil, fmt.Errorf("rules exceptions are not available on XSOAR 6")
+}
+
+func (b *Backend) CreateRulesException(rule map[string]interface{}) (*api.RulesException, error) {
+	return nil, fmt.Errorf("rules exceptions are not available on XSOAR 6")
+}
+
+func (b *Backend) DeleteRulesException(ruleID int) error {
+	return fmt.Errorf("rules exceptions are not available on XSOAR 6")
+}
+
+// --- Analytics Detectors ---
+// Not available on XSOAR 6.
+
+func (b *Backend) ListAnalyticsDetectors() ([]api.AnalyticsDetector, error) {
+	return nil, fmt.Errorf("analytics detectors are not available on XSOAR 6")
+}
+
+func (b *Backend) GetAnalyticsDetector(globalRuleID string) (*api.AnalyticsDetector, error) {
+	return nil, fmt.Errorf("analytics detectors are not available on XSOAR 6")
+}
+
+func (b *Backend) UpdateAnalyticsDetector(globalRuleID string, detector map[string]interface{}) (*api.AnalyticsDetector, error) {
+	return nil, fmt.Errorf("analytics detectors are not available on XSOAR 6")
+}
+
+// --- FIM Rule Groups ---
+// Not available on XSOAR 6.
+
+func (b *Backend) ListFIMRuleGroups() ([]api.FIMRuleGroup, error) {
+	return nil, fmt.Errorf("FIM rule groups are not available on XSOAR 6")
+}
+
+func (b *Backend) GetFIMRuleGroup(groupID int) (*api.FIMRuleGroup, error) {
+	return nil, fmt.Errorf("FIM rule groups are not available on XSOAR 6")
+}
+
+func (b *Backend) CreateFIMRuleGroup(group map[string]interface{}) (*api.FIMRuleGroup, error) {
+	return nil, fmt.Errorf("FIM rule groups are not available on XSOAR 6")
+}
+
+func (b *Backend) UpdateFIMRuleGroup(groupID int, group map[string]interface{}) (*api.FIMRuleGroup, error) {
+	return nil, fmt.Errorf("FIM rule groups are not available on XSOAR 6")
+}
+
+func (b *Backend) DeleteFIMRuleGroup(groupID int) error {
+	return fmt.Errorf("FIM rule groups are not available on XSOAR 6")
+}
+
+// --- FIM Rules ---
+// Not available on XSOAR 6.
+
+func (b *Backend) ListFIMRules() ([]api.FIMRule, error) {
+	return nil, fmt.Errorf("FIM rules are not available on XSOAR 6")
+}
+
+func (b *Backend) GetFIMRule(ruleID int) (*api.FIMRule, error) {
+	return nil, fmt.Errorf("FIM rules are not available on XSOAR 6")
+}
+
+func (b *Backend) CreateFIMRule(rule map[string]interface{}) (*api.FIMRule, error) {
+	return nil, fmt.Errorf("FIM rules are not available on XSOAR 6")
+}
+
+func (b *Backend) UpdateFIMRule(ruleID int, rule map[string]interface{}) (*api.FIMRule, error) {
+	return nil, fmt.Errorf("FIM rules are not available on XSOAR 6")
+}
+
+func (b *Backend) DeleteFIMRule(ruleID int) error {
+	return fmt.Errorf("FIM rules are not available on XSOAR 6")
+}
+
+// --- Notification Rules ---
+// Not available on XSOAR 6.
+
+func (b *Backend) ListNotificationRules() ([]api.NotificationRule, error) {
+	return nil, fmt.Errorf("notification rules are not available on XSOAR 6")
+}
+
+func (b *Backend) GetNotificationRule(ruleID int) (*api.NotificationRule, error) {
+	return nil, fmt.Errorf("notification rules are not available on XSOAR 6")
+}
+
+func (b *Backend) CreateNotificationRule(rule map[string]interface{}) (*api.NotificationRule, error) {
+	return nil, fmt.Errorf("notification rules are not available on XSOAR 6")
+}
+
+func (b *Backend) UpdateNotificationRule(ruleID int, rule map[string]interface{}) (*api.NotificationRule, error) {
+	return nil, fmt.Errorf("notification rules are not available on XSOAR 6")
+}
+
+func (b *Backend) DeleteNotificationRule(ruleID int) error {
+	return fmt.Errorf("notification rules are not available on XSOAR 6")
+}
+
+// --- Auto Upgrade Settings ---
+// Not available on XSOAR 6.
+
+func (b *Backend) GetAutoUpgradeSettings() (*api.AutoUpgradeSettings, error) {
+	return nil, fmt.Errorf("auto upgrade settings are not available on XSOAR 6")
+}
+
+func (b *Backend) UpdateAutoUpgradeSettings(settings map[string]interface{}) (*api.AutoUpgradeSettings, error) {
+	return nil, fmt.Errorf("auto upgrade settings are not available on XSOAR 6")
+}
+
+// --- Parsing Rules ---
+// Not available on XSOAR 6.
+
+func (b *Backend) GetParsingRules() (*api.ParsingRules, error) {
+	return nil, fmt.Errorf("parsing rules are not available on XSOAR 6")
+}
+
+func (b *Backend) SaveParsingRules(text string, baseHash string) (*api.ParsingRules, error) {
+	return nil, fmt.Errorf("parsing rules are not available on XSOAR 6")
+}
+
+// --- Data Modeling Rules ---
+// Not available on XSOAR 6.
+
+func (b *Backend) GetDataModelingRules() (*api.DataModelingRules, error) {
+	return nil, fmt.Errorf("data modeling rules are not available on XSOAR 6")
+}
+
+func (b *Backend) SaveDataModelingRules(text string, baseHash string) (*api.DataModelingRules, error) {
+	return nil, fmt.Errorf("data modeling rules are not available on XSOAR 6")
+}
+
+// --- Collector Groups ---
+// Not available on XSOAR 6.
+
+func (b *Backend) ListCollectorGroups() ([]api.CollectorGroup, error) {
+	return nil, fmt.Errorf("collector groups are not available on XSOAR 6")
+}
+
+func (b *Backend) GetCollectorGroup(groupID int) (*api.CollectorGroup, error) {
+	return nil, fmt.Errorf("collector groups are not available on XSOAR 6")
+}
+
+func (b *Backend) CreateCollectorGroup(group map[string]interface{}) (*api.CollectorGroup, error) {
+	return nil, fmt.Errorf("collector groups are not available on XSOAR 6")
+}
+
+func (b *Backend) UpdateCollectorGroup(groupID int, group map[string]interface{}) (*api.CollectorGroup, error) {
+	return nil, fmt.Errorf("collector groups are not available on XSOAR 6")
+}
+
+func (b *Backend) DeleteCollectorGroup(groupID int) error {
+	return fmt.Errorf("collector groups are not available on XSOAR 6")
+}
+
+// --- Collector Distributions ---
+// Not available on XSOAR 6.
+
+func (b *Backend) ListCollectorDistributions() ([]api.CollectorDistribution, error) {
+	return nil, fmt.Errorf("collector distributions are not available on XSOAR 6")
+}
+
+func (b *Backend) CreateCollectorDistribution(dist map[string]interface{}) (*api.CollectorDistribution, error) {
+	return nil, fmt.Errorf("collector distributions are not available on XSOAR 6")
+}
+
+func (b *Backend) DeleteCollectorDistribution(distributionID string) error {
+	return fmt.Errorf("collector distributions are not available on XSOAR 6")
+}
+
+// --- Collector Profiles ---
+// Not available on XSOAR 6.
+
+func (b *Backend) ListCollectorProfiles() ([]api.CollectorProfile, error) {
+	return nil, fmt.Errorf("collector profiles are not available on XSOAR 6")
+}
+
+func (b *Backend) CreateCollectorProfile(profile map[string]interface{}) (*api.CollectorProfile, error) {
+	return nil, fmt.Errorf("collector profiles are not available on XSOAR 6")
+}
+
+// --- Datasets ---
+// Not available on XSOAR 6.
+
+func (b *Backend) ListDatasets() ([]api.Dataset, error) {
+	return nil, fmt.Errorf("datasets are not available on XSOAR 6")
+}
+
+// --- Broker VMs ---
+// Not available on XSOAR 6.
+
+func (b *Backend) ListBrokerVMs() ([]api.BrokerVM, error) {
+	return nil, fmt.Errorf("broker VMs are not available on XSOAR 6")
+}
+
+// --- Collector Policies ---
+// Not available on XSOAR 6.
+
+func (b *Backend) ListCollectorPolicies() ([]api.CollectorPolicy, error) {
+	return nil, fmt.Errorf("collector policies are not available on XSOAR 6")
+}
+
+// --- ASM Asset Removal ---
+// Not available on XSOAR 6.
+
+func (b *Backend) BulkRemoveASMAssets(assets []map[string]string) (*api.ASMAssetRemoval, error) {
+	return nil, fmt.Errorf("ASM asset removal is not available on XSOAR 6")
 }
 
 // --- Helper functions ---

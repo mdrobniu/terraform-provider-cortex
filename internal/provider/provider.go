@@ -8,6 +8,7 @@ import (
 	v6 "terraform-provider-cortex/internal/api/v6"
 	v8 "terraform-provider-cortex/internal/api/v8"
 	"terraform-provider-cortex/internal/client"
+	"terraform-provider-cortex/internal/datasources"
 	"terraform-provider-cortex/internal/providerdata"
 	"terraform-provider-cortex/internal/resources"
 
@@ -251,6 +252,18 @@ func (p *XSOARProvider) Configure(ctx context.Context, req provider.ConfigureReq
 			}
 		}
 
+		// Fall back to session file from cortex-login (for XSIAM or SaaS)
+		if v8Backend.WebappClient == nil {
+			wc, err := client.NewWebappClientFromSessionFile(insecure)
+			if err == nil {
+				v8Backend.SetWebappClient(wc)
+				tflog.Info(ctx, "Webapp session file auth established", map[string]interface{}{
+					"session_file": "~/.cortex/session.json",
+				})
+			}
+			// No warning if session file doesn't exist - it's optional
+		}
+
 		backend = v8Backend
 	default:
 		backend = v6.NewBackend(c)
@@ -287,11 +300,36 @@ func (p *XSOARProvider) Resources(_ context.Context) []func() resource.Resource 
 		resources.NewBackupScheduleResource,
 		resources.NewSecuritySettingsResource,
 		resources.NewListResource,
+		resources.NewCorrelationRuleResource,
+		resources.NewIOCRuleResource,
+		resources.NewEDLResource,
+		resources.NewVulnerabilityScanSettingsResource,
+		resources.NewDeviceControlClassResource,
+		resources.NewCustomStatusResource,
+		resources.NewAgentGroupResource,
+		resources.NewIncidentDomainResource,
+		resources.NewTIMRuleResource,
+		resources.NewAttackSurfaceRuleResource,
+		resources.NewBIOCRuleResource,
+		resources.NewRulesExceptionResource,
+		resources.NewAnalyticsDetectorResource,
+		resources.NewFIMRuleGroupResource,
+		resources.NewFIMRuleResource,
+		resources.NewNotificationRuleResource,
+		resources.NewAutoUpgradeSettingsResource,
+		resources.NewParsingRulesResource,
+		resources.NewDataModelingRulesResource,
+		resources.NewCollectorGroupResource,
+		resources.NewCollectorDistributionResource,
+		resources.NewCollectorProfileResource,
+		resources.NewASMAssetRemovalResource,
 	}
 }
 
 func (p *XSOARProvider) DataSources(_ context.Context) []func() datasource.DataSource {
 	return []func() datasource.DataSource{
-		// Data sources will be added later
+		datasources.NewDatasetsDataSource,
+		datasources.NewBrokerVMsDataSource,
+		datasources.NewCollectorPoliciesDataSource,
 	}
 }

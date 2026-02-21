@@ -11,6 +11,8 @@ import (
 	"net/http"
 	"net/http/cookiejar"
 	"net/url"
+	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -24,6 +26,7 @@ type WebappClient struct {
 	UIURL      string
 	HTTPClient *http.Client
 	csrfToken  string
+	xsrfToken  string // Bearer JWT for x-xsrf-token header (XSIAM/SaaS)
 }
 
 // NewWebappClient creates a webapp client and authenticates via the login flow.
@@ -51,6 +54,9 @@ func NewWebappClient(ctx context.Context, uiURL, username, password string, inse
 		Transport: transport,
 		Timeout:   60 * time.Second,
 		Jar:       jar,
+		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			return http.ErrUseLastResponse
+		},
 	}
 
 	wc := &WebappClient{
@@ -89,6 +95,9 @@ func NewWebappClientFromToken(uiURL, sessionToken string, insecure bool) (*Webap
 		Transport: transport,
 		Timeout:   60 * time.Second,
 		Jar:       jar,
+		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			return http.ErrUseLastResponse
+		},
 	}
 
 	// Parse the UI URL to set cookies on the correct domain
@@ -116,6 +125,136 @@ func NewWebappClientFromToken(uiURL, sessionToken string, insecure bool) (*Webap
 		UIURL:      uiURL,
 		HTTPClient: httpClient,
 	}, nil
+}
+
+// SessionFile represents the structure of ~/.cortex/session.json.
+type SessionFile struct {
+	URL        string            `json:"url"`
+	Cookies    map[string]string `json:"cookies"`
+	AllCookies map[string]string `json:"all_cookies"`
+	XSRFToken  string            `json:"xsrf_token"`
+	CSRFToken  string            `json:"csrf_token"`
+	Expiry     int64             `json:"expiry"`
+}
+
+// NewWebappClientFromSessionFile creates a webapp client from ~/.cortex/session.json.
+// This is used when the cortex-login tool has been run to capture SSO session cookies.
+func NewWebappClientFromSessionFile(insecure bool) (*WebappClient, error) {
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return nil, fmt.Errorf("getting home directory: %w", err)
+	}
+
+	sessionPath := filepath.Join(homeDir, ".cortex", "session.json")
+	data, err := os.ReadFile(sessionPath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, fmt.Errorf("no session file found at %s; run cortex-login first", sessionPath)
+		}
+		return nil, fmt.Errorf("reading session file: %w", err)
+	}
+
+	var session SessionFile
+	if err := json.Unmarshal(data, &session); err != nil {
+		return nil, fmt.Errorf("parsing session file: %w", err)
+	}
+
+	// Check expiry
+	if session.Expiry > 0 && time.Now().Unix() > session.Expiry {
+		return nil, fmt.Errorf("session expired at %s; run cortex-login to re-authenticate",
+			time.Unix(session.Expiry, 0).Format(time.RFC3339))
+	}
+
+	if session.URL == "" {
+		return nil, fmt.Errorf("session file missing URL")
+	}
+
+	uiURL := strings.TrimRight(session.URL, "/")
+
+	jar, err := cookiejar.New(nil)
+	if err != nil {
+		return nil, fmt.Errorf("creating cookie jar: %w", err)
+	}
+
+	transport := &http.Transport{
+		TLSClientConfig: &tls.Config{
+			InsecureSkipVerify: insecure,
+		},
+		MaxIdleConns:        10,
+		IdleConnTimeout:     30 * time.Second,
+		TLSHandshakeTimeout: 10 * time.Second,
+	}
+
+	httpClient := &http.Client{
+		Transport: transport,
+		Timeout:   60 * time.Second,
+		Jar:       jar,
+		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			return http.ErrUseLastResponse
+		},
+	}
+
+	parsedURL, err := url.Parse(uiURL)
+	if err != nil {
+		return nil, fmt.Errorf("parsing session URL: %w", err)
+	}
+
+	// Set all cookies from the session file
+	cookieSource := session.AllCookies
+	if len(cookieSource) == 0 {
+		cookieSource = session.Cookies
+	}
+	var cookies []*http.Cookie
+	for name, value := range cookieSource {
+		cookies = append(cookies, &http.Cookie{
+			Name:  name,
+			Value: value,
+			Path:  "/",
+		})
+	}
+	// Add XSRF-TOKEN and csrf_token as cookies (double-submit cookie pattern)
+	if session.XSRFToken != "" {
+		cookies = append(cookies, &http.Cookie{
+			Name:  "XSRF-TOKEN",
+			Value: session.XSRFToken,
+			Path:  "/",
+		})
+	}
+	if session.CSRFToken != "" {
+		cookies = append(cookies, &http.Cookie{
+			Name:  "csrf_token",
+			Value: session.CSRFToken,
+			Path:  "/",
+		})
+	}
+	jar.SetCookies(parsedURL, cookies)
+
+	wc := &WebappClient{
+		UIURL:      uiURL,
+		HTTPClient: httpClient,
+		csrfToken:  session.CSRFToken,
+		xsrfToken:  session.XSRFToken,
+	}
+
+	return wc, nil
+}
+
+// SessionFileURL returns the URL from the session file, or empty string if not available.
+func SessionFileURL() string {
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return ""
+	}
+	sessionPath := filepath.Join(homeDir, ".cortex", "session.json")
+	data, err := os.ReadFile(sessionPath)
+	if err != nil {
+		return ""
+	}
+	var session SessionFile
+	if err := json.Unmarshal(data, &session); err != nil {
+		return ""
+	}
+	return session.URL
 }
 
 // login performs the two-step login flow to obtain session cookies.
@@ -226,6 +365,9 @@ func (wc *WebappClient) DoRequest(ctx context.Context, method, path string, body
 	if wc.csrfToken != "" {
 		req.Header.Set("X-CSRF-TOKEN", wc.csrfToken)
 	}
+	if wc.xsrfToken != "" {
+		req.Header.Set("X-XSRF-TOKEN", wc.xsrfToken)
+	}
 
 	tflog.Debug(ctx, fmt.Sprintf("Webapp API %s %s", method, path))
 
@@ -238,6 +380,15 @@ func (wc *WebappClient) DoRequest(ctx context.Context, method, path string, body
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, 0, fmt.Errorf("reading webapp response body: %w", err)
+	}
+
+	if resp.StatusCode >= 300 && resp.StatusCode < 400 {
+		location := resp.Header.Get("Location")
+		return respBody, resp.StatusCode, &APIError{
+			StatusCode: resp.StatusCode,
+			Message:    fmt.Sprintf("redirect to %s (session may be expired; re-run cortex-login)", location),
+			Path:       path,
+		}
 	}
 
 	if resp.StatusCode >= 400 {

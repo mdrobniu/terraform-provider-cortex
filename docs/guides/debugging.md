@@ -72,6 +72,27 @@ The resource operation is not available on this XSOAR version/deployment:
 
 XSOAR returns 303 to signal that a resource or endpoint is not available. The provider treats this as an error. This usually means the endpoint does not exist on your XSOAR version.
 
+### Webapp Resources: "webapp session required" or "XSIAM webapp session required"
+
+The resource requires a session token for webapp API access. Solutions:
+
+1. **Use `cortex-login`**: Run `cortex-login --url https://mytenant.xdr.us.paloaltonetworks.com` to authenticate and save session cookies to `~/.cortex/session.json`. The provider loads this file automatically.
+2. **Set `session_token`**: Copy the session cookie from browser DevTools and set it in the provider config or via `CORTEX_SESSION_TOKEN`.
+3. **For XSOAR 8 OPP**: Use `ui_url`, `username`, and `password` instead of `session_token`.
+
+### Webapp Resources: HTTP 403 or "Session expired"
+
+The session token has expired. Session tokens typically last 8 hours. Re-run `cortex-login` or obtain a fresh token from browser DevTools.
+
+### Webapp Resources: Unexpected API Errors After XSIAM Upgrade
+
+The 16 XSIAM webapp resources use internal webapp API endpoints that were developed against **XSIAM V3.4**. These endpoints are not part of the official public API and may change between XSIAM versions. If webapp resources stop working after an upgrade:
+
+1. Enable trace logging: `TF_LOG=TRACE terraform plan`
+2. Check the API endpoint path and response in the logs
+3. The endpoint may have moved or the request/response format may have changed
+4. File an issue with the full trace log (redact sensitive data)
+
 ## Reporting Issues
 
 When reporting an issue, include:

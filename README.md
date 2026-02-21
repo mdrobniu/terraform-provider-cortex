@@ -7,7 +7,7 @@ A Terraform provider for managing [Palo Alto Cortex XSOAR](https://www.paloalton
 
 ## Features
 
-- **18 resources** covering the full configuration surface
+- **41 resources + 3 data sources** covering the full configuration surface
 - **Multi-version support** -- automatically detects XSOAR 6, XSOAR 8, and XSIAM via the `/about` endpoint
 - **Deployment-mode aware** -- handles XSOAR 8 OPP, SaaS, and XSIAM differences transparently
 - **Session auth for OPP** -- optional webapp login for managing external storage, backup schedules, and security settings
@@ -64,7 +64,7 @@ provider "cortex" {
 
 # XSIAM (requires auth_id)
 provider "cortex" {
-  base_url = "https://api-xsiam.xdr.us.paloaltonetworks.com"
+  base_url = "https://api-mytenant.xdr.us.paloaltonetworks.com"
   api_key  = var.xsiam_api_key
   auth_id  = var.xsiam_auth_id
   insecure = true
@@ -197,8 +197,39 @@ terraform apply
 | `cortex_backup_schedule`         | per-sched  | Backup retention schedules               | --  | Y*     | --      | --    |
 | `cortex_security_settings`       | singleton  | Security/authentication settings         | --  | Y*     | --      | --    |
 | `cortex_list`                    | per-list   | Lists (IP lists, CSV, JSON, text)        | Y   | Y      | Y       | Y     |
+| `cortex_correlation_rule`        | per-rule   | XSIAM correlation rules                  | --  | --     | --      | W     |
+| `cortex_ioc_rule`                | per-rule   | XSIAM IOC rules                          | --  | --     | --      | W     |
+| `cortex_edl`                     | singleton  | External Dynamic List config             | --  | --     | --      | W     |
+| `cortex_vulnerability_scan_settings` | singleton | Vulnerability scan settings          | --  | --     | --      | W     |
+| `cortex_agent_group`             | per-group  | Endpoint agent groups                    | --  | --     | --      | W     |
+| `cortex_notification_rule`       | per-rule   | Alert notification/forwarding rules      | --  | --     | --      | W     |
+| `cortex_bioc_rule`               | per-rule   | Behavioral IOC rules                     | --  | --     | --      | W     |
+| `cortex_tim_rule`                | per-rule   | Threat Intelligence rules                | --  | --     | --      | W     |
+| `cortex_fim_rule_group`          | per-group  | FIM rule groups                          | --  | --     | --      | W     |
+| `cortex_fim_rule`                | per-rule   | File Integrity Monitoring rules          | --  | --     | --      | W     |
+| `cortex_analytics_detector`      | per-rule   | Analytics detector overrides             | --  | --     | --      | W     |
+| `cortex_attack_surface_rule`     | per-rule   | Attack surface rule overrides            | --  | --     | --      | W     |
+| `cortex_device_control_class`    | per-class  | USB device control classes               | --  | --     | --      | W     |
+| `cortex_custom_status`           | per-status | Custom alert/incident statuses           | --  | --     | --      | W     |
+| `cortex_incident_domain`         | per-domain | Incident domain categories               | --  | --     | --      | W     |
+| `cortex_rules_exception`         | per-rule   | Detection rule exceptions                | --  | --     | --      | W     |
+| `cortex_parsing_rules`           | singleton  | XQL parsing rules                        | --  | --     | --      | W     |
+| `cortex_data_modeling_rules`     | singleton  | XQL data modeling rules                  | --  | --     | --      | W     |
+| `cortex_auto_upgrade_settings`   | singleton  | Collector auto-upgrade settings          | --  | --     | --      | W     |
+| `cortex_collector_group`         | per-group  | XDR collector groups                     | --  | --     | --      | W     |
+| `cortex_collector_distribution`  | per-dist   | XDR collector distribution packages      | --  | --     | --      | W     |
+| `cortex_collector_profile`       | per-prof   | XDR collector profiles                   | --  | --     | --      | W     |
+| `cortex_asm_asset_removal`       | bulk       | Bulk ASM asset removal (irreversible)    | --  | --     | --      | W     |
 
-**Y** = full CRUD, **RO** = read-only, **--** = not available, **Y*** = requires session auth (`ui_url` + `username` + `password`)
+### Data Sources
+
+| Data Source                      | Description                              | Availability |
+|----------------------------------|------------------------------------------|:------------:|
+| `cortex_datasets`                | List all datasets                        | XSIAM (W)    |
+| `cortex_broker_vms`              | List broker VM devices                   | XSIAM (W)    |
+| `cortex_collector_policies`      | List collector policies                  | XSIAM (W)    |
+
+**Y** = full CRUD, **RO** = read-only, **--** = not available, **Y*** = requires session auth (`ui_url` + `username` + `password`), **W** = requires webapp session token
 
 ## Authentication
 
@@ -239,7 +270,8 @@ provider/
       backend.go                   # XSOARBackend interface + data types
       v6/backend.go                # XSOAR 6 API implementation
       v8/backend.go                # XSOAR 8 / XSIAM API implementation (/xsoar/ prefix)
-    resources/                     # One file per resource type (18 resources)
+    resources/                     # One file per resource type (34 resources)
+    datasources/                   # Data source implementations (3 data sources)
   examples/                        # Example .tf configurations
   tools/xsoar-export/              # Python export tool
 ```
@@ -287,9 +319,9 @@ python3 xsoar_export.py \
 
 # Export from XSIAM
 python3 xsoar_export.py \
-  --url https://api-xsiam.xdr.us.paloaltonetworks.com \
+  --url https://api-mytenant.xdr.us.paloaltonetworks.com \
   --api-key YOUR_API_KEY \
-  --auth-id 413 \
+  --auth-id YOUR_AUTH_ID \
   --insecure \
   --output-dir ./exported
 
