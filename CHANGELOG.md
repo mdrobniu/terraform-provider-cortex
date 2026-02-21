@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.1.3
+
+### Unit Tests
+- Added 137 unit tests (57 Go + 80 Python) covering HTTP client, API backends, and export tool
+- Go: errors, auth headers, retry logic, redirect handling, version detection, API path verification, XSIAM guards
+- Python: HCL generation, sanitize_tf_id, grid helpers, PlatformInfo, export functions
+
+### Improvements
+- Refactored Client.RetryDelays to configurable field for testability
+- Updated README and examples to match current password_policy schema
+- Renamed xsoar_export.py to cortex_export.py with expanded XSIAM support (22 resource types)
+
 ## 0.2.0
 
 ### XSIAM Webapp Resources (16 new resources)
