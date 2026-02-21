@@ -20,9 +20,10 @@ type Client struct {
 	APIKey         string
 	AuthID         string // x-xdr-auth-id for XSOAR 8
 	HTTPClient     *http.Client
-	Version        int    // 6 or 8, detected from /about
-	DeploymentMode string // "saas", "opp", or "" (V6)
-	ProductMode    string // "xsoar", "xsiam", or "" (V6)
+	RetryDelays    []time.Duration // delays between retry attempts (first element is delay before first attempt)
+	Version        int             // 6 or 8, detected from /about
+	DeploymentMode string          // "saas", "opp", or "" (V6)
+	ProductMode    string          // "xsoar", "xsiam", or "" (V6)
 }
 
 // NewClient creates a new XSOAR API client.
@@ -49,9 +50,10 @@ func NewClient(baseURL, apiKey string, insecure bool) (*Client, error) {
 	}
 
 	return &Client{
-		BaseURL:    baseURL,
-		APIKey:     apiKey,
-		HTTPClient: httpClient,
+		BaseURL:     baseURL,
+		APIKey:      apiKey,
+		HTTPClient:  httpClient,
+		RetryDelays: []time.Duration{0, 1 * time.Second, 5 * time.Second, 15 * time.Second},
 	}, nil
 }
 
@@ -72,7 +74,7 @@ func (c *Client) DoRequest(ctx context.Context, method, path string, body interf
 	url := fmt.Sprintf("%s%s", c.BaseURL, path)
 
 	var lastErr error
-	retryDelays := []time.Duration{0, 1 * time.Second, 5 * time.Second, 15 * time.Second}
+	retryDelays := c.RetryDelays
 
 	for attempt, delay := range retryDelays {
 		if delay > 0 {
