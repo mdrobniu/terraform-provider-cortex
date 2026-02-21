@@ -15,20 +15,15 @@ resource "cortex_server_config" "concurrent_jobs" {
 
 # Password policy
 resource "cortex_password_policy" "main" {
-  min_length                  = 12
-  min_length_enabled          = true
-  min_lowercase               = 1
-  min_lowercase_enabled       = true
-  min_uppercase               = 1
-  min_uppercase_enabled       = true
-  min_digits                  = 1
-  min_digits_enabled          = true
-  min_special                 = 1
-  min_special_enabled         = true
-  max_failed_attempts         = 5
-  max_failed_attempts_enabled = true
-  expiration_days             = 90
-  expiration_days_enabled     = true
+  enabled                   = true
+  min_password_length       = 12
+  min_lowercase_chars       = 1
+  min_uppercase_chars       = 1
+  min_digits_or_symbols     = 1
+  max_failed_login_attempts = 5
+  self_unlock_after_minutes = 30
+  expire_after              = 90
+  prevent_repetition        = true
 }
 
 # Jobs (cron-based for XSOAR 6/8)

@@ -101,20 +101,15 @@ variable "virustotal_key" {
 # All attributes shown with their default values
 
 resource "cortex_password_policy" "main" {
-  min_length                  = 12    # Minimum password length
-  min_length_enabled          = true  # Enforce minimum length
-  min_lowercase               = 1     # Minimum lowercase characters
-  min_lowercase_enabled       = true  # Enforce minimum lowercase
-  min_uppercase               = 1     # Minimum uppercase characters
-  min_uppercase_enabled       = true  # Enforce minimum uppercase
-  min_digits                  = 1     # Minimum digit characters
-  min_digits_enabled          = true  # Enforce minimum digits
-  min_special                 = 1     # Minimum special characters
-  min_special_enabled         = true  # Enforce minimum special
-  max_failed_attempts         = 5     # Lock after N failed login attempts
-  max_failed_attempts_enabled = true  # Enforce failed attempt lockout
-  expiration_days             = 90    # Password expires after N days
-  expiration_days_enabled     = true  # Enforce password expiration
+  enabled                  = true   # Enable password policy enforcement
+  min_password_length      = 12     # Minimum password length
+  min_lowercase_chars      = 1      # Minimum lowercase characters
+  min_uppercase_chars      = 1      # Minimum uppercase characters
+  min_digits_or_symbols    = 1      # Minimum digits or special characters
+  max_failed_login_attempts = 5     # Lock after N failed login attempts
+  self_unlock_after_minutes = 30    # Auto-unlock after N minutes (0 = manual)
+  expire_after             = 90     # Password expires after N months (0 = never)
+  prevent_repetition       = true   # Prevent password reuse
 }
 
 # --- cortex_credential (per-cred) ---

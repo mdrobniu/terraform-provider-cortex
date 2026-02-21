@@ -129,16 +129,12 @@ resource "cortex_server_config" "session_timeout" {
 
 # Configure password policy
 resource "cortex_password_policy" "main" {
-  min_length            = 12
-  min_length_enabled    = true
-  min_lowercase         = 1
-  min_lowercase_enabled = true
-  min_uppercase         = 1
-  min_uppercase_enabled = true
-  min_digits            = 1
-  min_digits_enabled    = true
-  min_special           = 1
-  min_special_enabled   = true
+  enabled               = true
+  min_password_length   = 12
+  min_lowercase_chars   = 1
+  min_uppercase_chars   = 1
+  min_digits_or_symbols = 1
+  prevent_repetition    = true
 }
 
 # Store credentials
